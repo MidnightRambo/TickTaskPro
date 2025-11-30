@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import { useStore } from '../store'
-import type { Priority, Quadrant } from '../types'
+import type { Priority, Quadrant, Task } from '../types'
 import { format, formatRelative } from '../utils/date'
 import {
   XMarkIcon,
@@ -43,7 +43,20 @@ export function TaskDrawer() {
     createTag,
   } = useStore()
   
-  const task = tasks.find(t => t.id === selectedTaskId)
+  // Find the current task from the store
+  const currentTask = tasks.find(t => t.id === selectedTaskId)
+  
+  // Keep a ref to the last valid task for exit animation
+  // This prevents returning null during AnimatePresence exit, which would break the animation
+  const lastTaskRef = useRef<Task | null>(null)
+  
+  // Update the ref when we have a valid task
+  if (currentTask) {
+    lastTaskRef.current = currentTask
+  }
+  
+  // Use the current task if available, otherwise use the last known task for exit animation
+  const task = currentTask || lastTaskRef.current
   
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -68,17 +81,18 @@ export function TaskDrawer() {
     { value: 6, label: 'Sat', short: 'S' },
   ]
 
-  // Sync local state with task
+  // Sync local state with task - only when we have a real current task
   useEffect(() => {
-    if (task) {
-      setTitle(task.title)
-      setDescription(task.description || '')
-      setPriority(task.priority)
-      setTaskTags(task.tags)
-      setListId(task.listId)
-      setManualQuadrant(task.manualQuadrant || 'auto')
+    // Only sync when we have a real current task, not the cached one for exit animation
+    if (currentTask) {
+      setTitle(currentTask.title)
+      setDescription(currentTask.description || '')
+      setPriority(currentTask.priority)
+      setTaskTags(currentTask.tags)
+      setListId(currentTask.listId)
+      setManualQuadrant(currentTask.manualQuadrant || 'auto')
       // Parse recurrence rule - handle weekdays:X,Y,Z format
-      const rule = task.recurrenceRule || ''
+      const rule = currentTask.recurrenceRule || ''
       if (rule.startsWith('weekdays:')) {
         setRecurrenceRule('weekdays')
         const days = rule.replace('weekdays:', '').split(',').map(Number).filter(n => !isNaN(n))
@@ -90,8 +104,8 @@ export function TaskDrawer() {
         }
       }
       
-      if (task.dueDate) {
-        const date = new Date(task.dueDate)
+      if (currentTask.dueDate) {
+        const date = new Date(currentTask.dueDate)
         setDueDate(format(date, 'yyyy-MM-dd'))
         setDueTime(format(date, 'HH:mm'))
       } else {
@@ -99,11 +113,14 @@ export function TaskDrawer() {
         setDueTime('')
       }
     }
-  }, [task])
+  }, [currentTask])
 
   if (!task) return null
 
   const handleSave = async () => {
+    // Defensive check: don't try to save if task doesn't exist
+    if (!task) return
+
     let dueDateISO: string | undefined = undefined
     if (dueDate) {
       const dateTime = dueTime ? `${dueDate}T${dueTime}` : `${dueDate}T12:00`
@@ -116,17 +133,22 @@ export function TaskDrawer() {
       finalRecurrenceRule = `weekdays:${selectedWeekdays.sort((a, b) => a - b).join(',')}`
     }
 
-    await updateTask({
-      ...task,
-      title,
-      description,
-      priority,
-      dueDate: dueDateISO,
-      listId,
-      tags: taskTags,
-      manualQuadrant: manualQuadrant === 'auto' ? undefined : manualQuadrant,
-      recurrenceRule: finalRecurrenceRule,
-    })
+    try {
+      await updateTask({
+        ...task,
+        title,
+        description,
+        priority,
+        dueDate: dueDateISO,
+        listId,
+        tags: taskTags,
+        manualQuadrant: manualQuadrant === 'auto' ? undefined : manualQuadrant,
+        recurrenceRule: finalRecurrenceRule,
+      })
+    } catch (error) {
+      // Task might have been deleted, silently fail
+      console.warn('Failed to save task (may have been deleted):', error)
+    }
   }
 
   const handleAddTag = async () => {
@@ -149,24 +171,45 @@ export function TaskDrawer() {
     setTaskTags(taskTags.filter(t => t !== tagName))
   }
 
-  const handleDelete = async () => {
-    if (confirm('Delete this task?')) {
-      await deleteTask(task.id)
-      selectTask(null) // Ensure drawer closes after deletion
-    }
-  }
-
+  // Close the drawer without deleting - just deselect the task
   const handleClose = () => {
     selectTask(null)
   }
 
-  // Auto-save on changes
+  // Delete the task after confirmation, then close the drawer
+  const handleDelete = async () => {
+    const confirmed = confirm('Delete this task?')
+    if (!confirmed) {
+      return // User cancelled - do nothing, keep panel open
+    }
+    
+    // Store the task ID before any state changes
+    const taskIdToDelete = task.id
+    
+    // Delete the task (this also clears selectedTaskId in the store)
+    await deleteTask(taskIdToDelete)
+    // Note: deleteTask already sets selectedTaskId to null, so drawer will close
+  }
+
+  // Auto-save on changes - with proper cleanup and safeguards
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (task) handleSave()
+    // Only auto-save if we have a REAL current task (not just cached for animation)
+    // This prevents saving during exit animation
+    if (!currentTask) return
+
+    const taskId = currentTask.id // Capture task ID for the closure
+    
+    const timeout = setTimeout(async () => {
+      // Double-check task still exists before saving
+      const stillExists = tasks.find(t => t.id === taskId)
+      if (!stillExists) return // Task was deleted, don't save
+      
+      // Call handleSave only if the task still exists
+      handleSave()
     }, 500)
+    
     return () => clearTimeout(timeout)
-  }, [title, description, priority, dueDate, dueTime, listId, taskTags, manualQuadrant, recurrenceRule, selectedWeekdays])
+  }, [currentTask?.id, title, description, priority, dueDate, dueTime, listId, taskTags, manualQuadrant, recurrenceRule, selectedWeekdays])
 
   return (
     <motion.div
@@ -181,19 +224,31 @@ export function TaskDrawer() {
         <div className="flex items-center justify-between p-4 border-b border-white/10 no-drag relative z-10">
           <h2 className="font-semibold">Task Details</h2>
           <div className="flex items-center gap-2">
+            {/* Delete button - shows confirmation dialog */}
             <button
               type="button"
-              onClick={handleDelete}
-              className="p-2 rounded-lg text-surface-500 hover:text-red-500 hover:bg-white/10 transition-colors cursor-pointer relative z-10"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                handleDelete()
+              }}
+              className="p-2 rounded-lg text-surface-500 hover:text-red-500 hover:bg-white/10 transition-colors cursor-pointer"
               aria-label="Delete task"
+              title="Delete task"
             >
               <TrashIcon className="w-5 h-5" />
             </button>
+            {/* Close button - just closes the panel, no deletion */}
             <button
               type="button"
-              onClick={handleClose}
-              className="p-2 rounded-lg text-surface-500 hover:text-white hover:bg-white/10 transition-colors cursor-pointer relative z-10"
-              aria-label="Close task details"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                handleClose()
+              }}
+              className="p-2 rounded-lg text-surface-500 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              aria-label="Close panel"
+              title="Close panel"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>

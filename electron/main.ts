@@ -1,10 +1,26 @@
-import { app, BrowserWindow, ipcMain, Notification, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, globalShortcut, nativeImage } from 'electron'
 import path from 'path'
+import fs from 'fs'
 import { initDatabase, getDatabase } from './database'
 import type { Task, List, Tag, Settings, EisenhowerRule } from '../src/types'
 
+// Set the app name for macOS dock and Windows taskbar
+app.name = 'TickTaskPro'
+
 let mainWindow: BrowserWindow | null = null
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
+
+// Resolve icon path - works for both dev and production
+function getIconPath(): string {
+  // NOTE: Replace assets/icons/icon.png with your real TickTaskPro icon
+  if (VITE_DEV_SERVER_URL) {
+    // Development: icon is relative to project root
+    return path.join(__dirname, '..', 'assets', 'icons', 'icon.png')
+  } else {
+    // Production: icon is in extraResources
+    return path.join(process.resourcesPath, 'icons', 'icon.png')
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -12,9 +28,11 @@ function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 700,
+    title: 'TickTaskPro',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
     backgroundColor: '#09090b',
+    icon: getIconPath(), // NOTE: Replace with real TickTaskPro icon
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -38,6 +56,25 @@ function createWindow() {
 
 app.whenReady().then(() => {
   initDatabase()
+  
+  // Set dock icon explicitly on macOS (important for development mode)
+  if (process.platform === 'darwin' && app.dock) {
+    const dockIconPath = VITE_DEV_SERVER_URL
+      ? path.join(__dirname, '..', 'assets', 'icons', 'icon.png')
+      : path.join(process.resourcesPath, 'icons', 'icon.png')
+    
+    // Only set if file exists (graceful fallback)
+    if (fs.existsSync(dockIconPath)) {
+      const icon = nativeImage.createFromPath(dockIconPath)
+      if (!icon.isEmpty()) {
+        app.dock.setIcon(icon)
+      }
+    } else {
+      console.log('TickTaskPro: Dock icon not found at:', dockIconPath)
+      console.log('Place your icon.png in assets/icons/ for the dock icon to appear.')
+    }
+  }
+  
   createWindow()
 
   app.on('activate', () => {

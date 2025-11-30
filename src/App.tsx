@@ -61,8 +61,8 @@ function App() {
         </main>
         
         {/* Task Detail Drawer */}
-        <AnimatePresence>
-          {selectedTaskId && <TaskDrawer />}
+        <AnimatePresence mode="wait">
+          {selectedTaskId && <TaskDrawer key="task-drawer" />}
         </AnimatePresence>
       </div>
       

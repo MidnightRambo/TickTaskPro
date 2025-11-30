@@ -175,8 +175,29 @@ export function Sidebar() {
       animate={{ width: sidebarCollapsed ? 60 : 240 }}
       transition={{ duration: 0.2 }}
     >
-      {/* Collapse Toggle */}
-      <div className="p-3 flex justify-end">
+      {/* App Branding & Collapse Toggle */}
+      <div className="p-3 flex items-center justify-between">
+        <AnimatePresence>
+          {!sidebarCollapsed && (
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              className="flex items-center gap-2"
+            >
+              {/* App Icon */}
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-brand-500 to-violet-500 flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 12 9 17 20 6" />
+                </svg>
+              </div>
+              {/* App Name */}
+              <span className="text-sm font-semibold bg-gradient-to-r from-brand-400 to-violet-400 bg-clip-text text-transparent">
+                TickTaskPro
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <button
           onClick={toggleSidebar}
           className="p-1.5 rounded-lg text-surface-500 hover:text-white hover:bg-white/10 transition-colors"

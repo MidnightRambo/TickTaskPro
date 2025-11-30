@@ -1,5 +1,5 @@
 {
-  "name": "ticktask-pro",
+  "name": "ticktaskpro",
   "version": "1.0.0",
   "description": "Secure Offline Task Manager with Customizable Eisenhower Matrix",
   "main": "dist-electron/main.js",
@@ -14,14 +14,21 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "build": {
-    "appId": "com.ticktask.pro",
-    "productName": "TickTask Pro",
+    "appId": "com.ticktaskpro.app",
+    "productName": "TickTaskPro",
     "directories": {
       "output": "release"
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/icons",
+        "to": "icons"
+      }
     ],
     "mac": {
       "target": [
@@ -30,7 +37,8 @@
           "arch": ["arm64"]
         }
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "icon": "assets/icons/icon.icns"
     },
     "win": {
       "target": [
@@ -38,7 +46,11 @@
           "target": "nsis",
           "arch": ["x64"]
         }
-      ]
+      ],
+      "icon": "assets/icons/icon.ico"
+    },
+    "linux": {
+      "icon": "assets/icons"
     },
     "nsis": {
       "oneClick": false,
