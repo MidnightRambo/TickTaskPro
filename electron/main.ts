@@ -25,7 +25,7 @@ function createWindow() {
 
   if (VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(VITE_DEV_SERVER_URL)
-    mainWindow.webContents.openDevTools()
+    // DevTools can be opened manually via Cmd+Opt+I or View menu
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }

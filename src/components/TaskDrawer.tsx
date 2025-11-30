@@ -53,8 +53,19 @@ export function TaskDrawer() {
   const [taskTags, setTaskTags] = useState<string[]>([])
   const [manualQuadrant, setManualQuadrant] = useState<Quadrant | 'auto'>('auto')
   const [recurrenceRule, setRecurrenceRule] = useState('')
+  const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([1, 2, 3, 4, 5]) // Mon-Fri default
   const [newTag, setNewTag] = useState('')
   const [isEditingDescription, setIsEditingDescription] = useState(false)
+
+  const WEEKDAYS = [
+    { value: 0, label: 'Sun', short: 'S' },
+    { value: 1, label: 'Mon', short: 'M' },
+    { value: 2, label: 'Tue', short: 'T' },
+    { value: 3, label: 'Wed', short: 'W' },
+    { value: 4, label: 'Thu', short: 'T' },
+    { value: 5, label: 'Fri', short: 'F' },
+    { value: 6, label: 'Sat', short: 'S' },
+  ]
 
   // Sync local state with task
   useEffect(() => {
@@ -65,7 +76,18 @@ export function TaskDrawer() {
       setTaskTags(task.tags)
       setListId(task.listId)
       setManualQuadrant(task.manualQuadrant || 'auto')
-      setRecurrenceRule(task.recurrenceRule || '')
+      // Parse recurrence rule - handle weekdays:X,Y,Z format
+      const rule = task.recurrenceRule || ''
+      if (rule.startsWith('weekdays:')) {
+        setRecurrenceRule('weekdays')
+        const days = rule.replace('weekdays:', '').split(',').map(Number).filter(n => !isNaN(n))
+        setSelectedWeekdays(days.length > 0 ? days : [1, 2, 3, 4, 5])
+      } else {
+        setRecurrenceRule(rule)
+        if (rule === 'weekdays') {
+          setSelectedWeekdays([1, 2, 3, 4, 5]) // Default Mon-Fri
+        }
+      }
       
       if (task.dueDate) {
         const date = new Date(task.dueDate)
@@ -87,6 +109,12 @@ export function TaskDrawer() {
       dueDateISO = new Date(dateTime).toISOString()
     }
 
+    // Format recurrence rule with weekdays if applicable
+    let finalRecurrenceRule: string | undefined = recurrenceRule || undefined
+    if (recurrenceRule === 'weekdays' && selectedWeekdays.length > 0) {
+      finalRecurrenceRule = `weekdays:${selectedWeekdays.sort((a, b) => a - b).join(',')}`
+    }
+
     await updateTask({
       ...task,
       title,
@@ -96,7 +124,7 @@ export function TaskDrawer() {
       listId,
       tags: taskTags,
       manualQuadrant: manualQuadrant === 'auto' ? undefined : manualQuadrant,
-      recurrenceRule: recurrenceRule || undefined,
+      recurrenceRule: finalRecurrenceRule,
     })
   }
 
@@ -123,7 +151,12 @@ export function TaskDrawer() {
   const handleDelete = async () => {
     if (confirm('Delete this task?')) {
       await deleteTask(task.id)
+      selectTask(null) // Ensure drawer closes after deletion
     }
+  }
+
+  const handleClose = () => {
+    selectTask(null)
   }
 
   // Auto-save on changes
@@ -132,7 +165,7 @@ export function TaskDrawer() {
       if (task) handleSave()
     }, 500)
     return () => clearTimeout(timeout)
-  }, [title, description, priority, dueDate, dueTime, listId, taskTags, manualQuadrant, recurrenceRule])
+  }, [title, description, priority, dueDate, dueTime, listId, taskTags, manualQuadrant, recurrenceRule, selectedWeekdays])
 
   return (
     <motion.div
@@ -150,12 +183,14 @@ export function TaskDrawer() {
             <button
               onClick={handleDelete}
               className="p-2 rounded-lg text-surface-500 hover:text-red-500 hover:bg-white/10 transition-colors"
+              aria-label="Delete task"
             >
               <TrashIcon className="w-5 h-5" />
             </button>
             <button
-              onClick={() => selectTask(null)}
+              onClick={handleClose}
               className="p-2 rounded-lg text-surface-500 hover:text-white hover:bg-white/10 transition-colors"
+              aria-label="Close task details"
             >
               <XMarkIcon className="w-5 h-5" />
             </button>
@@ -369,16 +404,60 @@ export function TaskDrawer() {
             </label>
             <select
               value={recurrenceRule}
-              onChange={(e) => setRecurrenceRule(e.target.value)}
+              onChange={(e) => {
+                setRecurrenceRule(e.target.value)
+                // Reset to default weekdays when switching to weekdays option
+                if (e.target.value === 'weekdays') {
+                  setSelectedWeekdays([1, 2, 3, 4, 5])
+                }
+              }}
               className="w-full"
             >
               <option value="">No recurrence</option>
               <option value="daily">Daily</option>
-              <option value="weekdays">Weekdays</option>
+              <option value="weekdays">Specific weekdays</option>
               <option value="weekly">Weekly</option>
               <option value="biweekly">Every 2 weeks</option>
               <option value="monthly">Monthly</option>
             </select>
+            
+            {/* Weekday selector - shown when weekdays option is selected */}
+            {recurrenceRule === 'weekdays' && (
+              <div className="mt-3">
+                <p className="text-xs text-surface-500 mb-2">Select which days this task should repeat:</p>
+                <div className="flex gap-1">
+                  {WEEKDAYS.map(day => {
+                    const isSelected = selectedWeekdays.includes(day.value)
+                    return (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => {
+                          if (isSelected) {
+                            // Don't allow deselecting all days
+                            if (selectedWeekdays.length > 1) {
+                              setSelectedWeekdays(selectedWeekdays.filter(d => d !== day.value))
+                            }
+                          } else {
+                            setSelectedWeekdays([...selectedWeekdays, day.value])
+                          }
+                        }}
+                        className={`
+                          w-9 h-9 rounded-lg text-xs font-medium transition-all
+                          ${isSelected 
+                            ? 'bg-brand-500 text-white' 
+                            : 'bg-white/5 text-surface-400 hover:bg-white/10'
+                          }
+                        `}
+                        title={day.label}
+                      >
+                        {day.short}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
