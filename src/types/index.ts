@@ -85,7 +85,7 @@ export interface TaskFilter {
   tags?: string[]
   listId?: string
   priority?: Priority[]
-  dueDate?: 'today' | 'upcoming' | 'overdue' | 'noDue'
+  dueDate?: 'today' | 'thisWeek' | 'upcoming' | 'overdue' | 'noDue'
   completed?: boolean
 }
 

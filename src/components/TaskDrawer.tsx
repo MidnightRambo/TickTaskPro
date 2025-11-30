@@ -178,32 +178,24 @@ export function TaskDrawer() {
     >
       <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <div className="flex items-center justify-between p-4 border-b border-white/10 no-drag relative z-10">
           <h2 className="font-semibold">Task Details</h2>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                handleDelete()
-              }}
-              className="p-2 rounded-lg text-surface-500 hover:text-red-500 hover:bg-white/10 transition-colors cursor-pointer"
+              onClick={handleDelete}
+              className="p-2 rounded-lg text-surface-500 hover:text-red-500 hover:bg-white/10 transition-colors cursor-pointer relative z-10"
               aria-label="Delete task"
             >
-              <TrashIcon className="w-5 h-5 pointer-events-none" />
+              <TrashIcon className="w-5 h-5" />
             </button>
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                handleClose()
-              }}
-              className="p-2 rounded-lg text-surface-500 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              onClick={handleClose}
+              className="p-2 rounded-lg text-surface-500 hover:text-white hover:bg-white/10 transition-colors cursor-pointer relative z-10"
               aria-label="Close task details"
             >
-              <XMarkIcon className="w-5 h-5 pointer-events-none" />
+              <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
         </div>

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import * as chrono from 'chrono-node'
 import type { Task, List, Tag, Settings, EisenhowerRule, TaskFilter, ViewMode, Quadrant, Priority } from '../types'
-import { calculateNextOccurrence } from '../utils/date'
+import { calculateNextOccurrence, startOfWeek, endOfWeek } from '../utils/date'
 
 interface AppState {
   // Data
@@ -384,6 +384,13 @@ export const useStore = create<AppState>((set, get) => ({
           case 'today':
             if (!taskDue || taskDue.toDateString() !== now.toDateString()) return false
             break
+          case 'thisWeek': {
+            if (!taskDue) return false
+            const weekStart = startOfWeek(now, 1) // Monday
+            const weekEnd = endOfWeek(now, 1) // Sunday
+            if (taskDue < weekStart || taskDue > weekEnd) return false
+            break
+          }
           case 'upcoming':
             if (!taskDue || taskDue <= now) return false
             break

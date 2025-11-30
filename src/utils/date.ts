@@ -108,6 +108,47 @@ export function endOfDay(date: Date): Date {
   return result
 }
 
+/**
+ * Get the start of the week (Monday) for a given date.
+ * @param date - The date to get the start of week for
+ * @param weekStartsOn - Day the week starts on (0=Sunday, 1=Monday, etc.). Default is 1 (Monday).
+ * @returns The start of the week (Monday 00:00:00.000)
+ */
+export function startOfWeek(date: Date, weekStartsOn: number = 1): Date {
+  const result = new Date(date)
+  const day = result.getDay()
+  // Calculate days to subtract to get to the start of the week
+  const diff = (day < weekStartsOn ? 7 : 0) + day - weekStartsOn
+  result.setDate(result.getDate() - diff)
+  result.setHours(0, 0, 0, 0)
+  return result
+}
+
+/**
+ * Get the end of the week (Sunday) for a given date.
+ * @param date - The date to get the end of week for
+ * @param weekStartsOn - Day the week starts on (0=Sunday, 1=Monday, etc.). Default is 1 (Monday).
+ * @returns The end of the week (Sunday 23:59:59.999)
+ */
+export function endOfWeek(date: Date, weekStartsOn: number = 1): Date {
+  const result = startOfWeek(date, weekStartsOn)
+  result.setDate(result.getDate() + 6)
+  result.setHours(23, 59, 59, 999)
+  return result
+}
+
+/**
+ * Check if a date falls within the current week (Monday to Sunday).
+ * @param date - The date to check
+ * @returns True if the date is within this week
+ */
+export function isThisWeek(date: Date): boolean {
+  const now = new Date()
+  const weekStart = startOfWeek(now, 1) // Monday
+  const weekEnd = endOfWeek(now, 1) // Sunday
+  return date >= weekStart && date <= weekEnd
+}
+
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date)
   result.setDate(result.getDate() + days)

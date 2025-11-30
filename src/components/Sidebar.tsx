@@ -5,6 +5,7 @@ import type { List } from '../types'
 import {
   InboxIcon,
   CalendarIcon,
+  CalendarDaysIcon,
   ClockIcon,
   CheckCircleIcon,
   TagIcon,
@@ -17,6 +18,7 @@ import {
   PencilIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
+import { startOfWeek, endOfWeek } from '../utils/date'
 
 // Color palette for lists - matches existing system
 const LIST_COLORS = [
@@ -115,6 +117,10 @@ export function Sidebar() {
   }
 
   // Smart filters with counts
+  const now = new Date()
+  const weekStart = startOfWeek(now, 1) // Monday
+  const weekEnd = endOfWeek(now, 1) // Sunday
+  
   const smartFilters = [
     {
       id: 'all',
@@ -129,9 +135,20 @@ export function Sidebar() {
       icon: CalendarIcon,
       count: tasks.filter(t => {
         if (t.completed || !t.dueDate) return false
-        return new Date(t.dueDate).toDateString() === new Date().toDateString()
+        return new Date(t.dueDate).toDateString() === now.toDateString()
       }).length,
       filter: { dueDate: 'today' as const, completed: false },
+    },
+    {
+      id: 'thisWeek',
+      label: 'This Week',
+      icon: CalendarDaysIcon,
+      count: tasks.filter(t => {
+        if (t.completed || !t.dueDate) return false
+        const dueDate = new Date(t.dueDate)
+        return dueDate >= weekStart && dueDate <= weekEnd
+      }).length,
+      filter: { dueDate: 'thisWeek' as const, completed: false },
     },
     {
       id: 'upcoming',
@@ -139,7 +156,7 @@ export function Sidebar() {
       icon: ClockIcon,
       count: tasks.filter(t => {
         if (t.completed || !t.dueDate) return false
-        return new Date(t.dueDate) > new Date()
+        return new Date(t.dueDate) > now
       }).length,
       filter: { dueDate: 'upcoming' as const, completed: false },
     },
