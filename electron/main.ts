@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification, globalShortcut, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, globalShortcut, nativeImage, dialog } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { initDatabase, getDatabase } from './database'
@@ -297,6 +297,154 @@ ipcMain.handle('notification:show', (_, { title, body, taskId }: { title: string
   
   notification.show()
   return true
+})
+
+// ============= BACKUP / EXPORT / IMPORT =============
+
+interface TickTaskProBackup {
+  version: number
+  exportedAt: string
+  tasks: Task[]
+  lists: List[]
+  tags: Tag[]
+  settings: Settings
+  rules: EisenhowerRule[]
+}
+
+// Export backup to file
+ipcMain.handle('backup:export', async (_, backupData: TickTaskProBackup) => {
+  const date = new Date().toISOString().split('T')[0]
+  const defaultFilename = `ticktaskpro-backup-${date}.json`
+  
+  const result = await dialog.showSaveDialog(mainWindow!, {
+    title: 'Export TickTaskPro Backup',
+    defaultPath: defaultFilename,
+    filters: [{ name: 'JSON Files', extensions: ['json'] }],
+  })
+  
+  if (result.canceled || !result.filePath) {
+    return { success: false, cancelled: true }
+  }
+  
+  try {
+    const jsonContent = JSON.stringify(backupData, null, 2)
+    fs.writeFileSync(result.filePath, jsonContent, 'utf-8')
+    return { success: true, filePath: result.filePath }
+  } catch (error) {
+    console.error('Backup export error:', error)
+    return { success: false, error: String(error) }
+  }
+})
+
+// Import backup from file
+ipcMain.handle('backup:import', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Import TickTaskPro Backup',
+    filters: [{ name: 'JSON Files', extensions: ['json'] }],
+    properties: ['openFile'],
+  })
+  
+  if (result.canceled || result.filePaths.length === 0) {
+    return { success: false, cancelled: true }
+  }
+  
+  try {
+    const filePath = result.filePaths[0]
+    const content = fs.readFileSync(filePath, 'utf-8')
+    const data = JSON.parse(content) as TickTaskProBackup
+    
+    // Basic validation
+    if (!data.version || !Array.isArray(data.tasks) || !Array.isArray(data.lists)) {
+      return { success: false, error: 'Invalid backup file format' }
+    }
+    
+    return { success: true, data }
+  } catch (error) {
+    console.error('Backup import error:', error)
+    return { success: false, error: String(error) }
+  }
+})
+
+// Restore backup data (replace all current data)
+ipcMain.handle('backup:restore', async (_, backupData: TickTaskProBackup) => {
+  const db = getDatabase()
+  
+  try {
+    db.transaction(() => {
+      // Clear existing data
+      db.prepare('DELETE FROM tasks').run()
+      db.prepare('DELETE FROM lists').run()
+      db.prepare('DELETE FROM tags').run()
+      db.prepare('DELETE FROM eisenhower_rules').run()
+      
+      // Restore lists
+      const insertList = db.prepare('INSERT INTO lists (id, name, color, icon, sortOrder) VALUES (?, ?, ?, ?, ?)')
+      for (const list of backupData.lists) {
+        insertList.run(list.id, list.name, list.color || '#6b7280', list.icon || 'list', list.sortOrder || 0)
+      }
+      
+      // Restore tags
+      const insertTag = db.prepare('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)')
+      for (const tag of backupData.tags) {
+        insertTag.run(tag.id, tag.name, tag.color || '#6b7280')
+      }
+      
+      // Restore tasks
+      const insertTask = db.prepare(`
+        INSERT INTO tasks (id, title, description, listId, tags, priority, dueDate, completed, recurrenceRule, createdAt, updatedAt, manualQuadrant)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      for (const task of backupData.tasks) {
+        insertTask.run(
+          task.id,
+          task.title,
+          task.description || null,
+          task.listId || null,
+          JSON.stringify(task.tags || []),
+          task.priority || 'none',
+          task.dueDate || null,
+          task.completed ? 1 : 0,
+          task.recurrenceRule || null,
+          task.createdAt,
+          task.updatedAt,
+          task.manualQuadrant || null
+        )
+      }
+      
+      // Restore rules
+      const insertRule = db.prepare(`
+        INSERT INTO eisenhower_rules (id, quadrant, name, conditions, logic)
+        VALUES (?, ?, ?, ?, ?)
+      `)
+      for (const rule of backupData.rules || []) {
+        insertRule.run(rule.id, rule.quadrant, rule.name, JSON.stringify(rule.conditions), rule.logic)
+      }
+      
+      // Restore settings
+      if (backupData.settings) {
+        db.prepare(`
+          UPDATE settings SET
+            defaultPriority = ?,
+            defaultDueDateRule = ?,
+            defaultReminder = ?,
+            autoApplyTags = ?,
+            theme = ?
+          WHERE id = 1
+        `).run(
+          backupData.settings.defaultPriority,
+          backupData.settings.defaultDueDateRule,
+          backupData.settings.defaultReminder,
+          JSON.stringify(backupData.settings.autoApplyTags || []),
+          backupData.settings.theme
+        )
+      }
+    })()
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Backup restore error:', error)
+    return { success: false, error: String(error) }
+  }
 })
 
 // Reminder scheduler

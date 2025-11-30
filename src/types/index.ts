@@ -129,6 +129,26 @@ export const QUADRANT_META: Record<Quadrant, { label: string; color: string; des
   },
 }
 
+// Backup / Export data structure
+export interface TickTaskProBackup {
+  version: number
+  exportedAt: string
+  tasks: Task[]
+  lists: List[]
+  tags: Tag[]
+  settings: Settings
+  rules: EisenhowerRule[]
+}
+
+// Backup operation result
+export interface BackupResult {
+  success: boolean
+  cancelled?: boolean
+  filePath?: string
+  error?: string
+  data?: TickTaskProBackup
+}
+
 // Window API type declaration
 declare global {
   interface Window {
@@ -162,6 +182,11 @@ declare global {
       }
       notification: {
         show: (options: { title: string; body: string; taskId: string }) => Promise<boolean>
+      }
+      backup: {
+        export: (data: TickTaskProBackup) => Promise<BackupResult>
+        import: () => Promise<BackupResult>
+        restore: (data: TickTaskProBackup) => Promise<BackupResult>
       }
       on: (channel: string, callback: (...args: unknown[]) => void) => void
       removeListener: (channel: string, callback: (...args: unknown[]) => void) => void

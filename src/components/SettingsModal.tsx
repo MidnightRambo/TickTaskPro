@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useStore } from '../store'
-import type { Priority } from '../types'
+import type { Priority, TickTaskProBackup } from '../types'
 import { DEFAULT_DUE_DATE_PRESETS } from '../types'
 import {
   XMarkIcon,
@@ -11,6 +11,10 @@ import {
   FlagIcon,
   BellIcon,
   PaintBrushIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
+  CheckCircleIcon,
+  ExclamationCircleIcon,
 } from '@heroicons/react/24/outline'
 
 const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
@@ -31,13 +35,18 @@ const REMINDER_OPTIONS = [
 ]
 
 export function SettingsModal() {
-  const { setSettingsOpen, settings, updateSettings, tags } = useStore()
+  const { setSettingsOpen, settings, updateSettings, tags, tasks, lists, rules, loadAll } = useStore()
   
   const [defaultPriority, setDefaultPriority] = useState<Priority>('none')
   const [defaultDueDateRule, setDefaultDueDateRule] = useState('none')
   const [defaultReminder, setDefaultReminder] = useState('none')
   const [autoApplyTags, setAutoApplyTags] = useState<string[]>([])
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  
+  // Backup state
+  const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' })
+  const [isExporting, setIsExporting] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
 
   // Load current settings
   useEffect(() => {
@@ -66,6 +75,95 @@ export function SettingsModal() {
       setAutoApplyTags(autoApplyTags.filter(t => t !== tagName))
     } else {
       setAutoApplyTags([...autoApplyTags, tagName])
+    }
+  }
+
+  // Export backup
+  const handleExport = async () => {
+    if (!settings) return
+    setIsExporting(true)
+    setBackupStatus({ type: null, message: '' })
+    
+    try {
+      const backup: TickTaskProBackup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        tasks,
+        lists,
+        tags,
+        settings,
+        rules,
+      }
+      
+      const result = await window.electronAPI.backup.export(backup)
+      
+      if (result.cancelled) {
+        setBackupStatus({ type: null, message: '' })
+      } else if (result.success) {
+        setBackupStatus({ type: 'success', message: 'Backup exported successfully!' })
+      } else {
+        setBackupStatus({ type: 'error', message: result.error || 'Export failed' })
+      }
+    } catch (error) {
+      setBackupStatus({ type: 'error', message: String(error) })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  // Import backup
+  const handleImport = async () => {
+    setIsImporting(true)
+    setBackupStatus({ type: null, message: '' })
+    
+    try {
+      // Step 1: Open file dialog and read backup
+      const importResult = await window.electronAPI.backup.import()
+      
+      if (importResult.cancelled) {
+        setBackupStatus({ type: null, message: '' })
+        setIsImporting(false)
+        return
+      }
+      
+      if (!importResult.success || !importResult.data) {
+        setBackupStatus({ type: 'error', message: importResult.error || 'Invalid backup file' })
+        setIsImporting(false)
+        return
+      }
+      
+      const backup = importResult.data
+      
+      // Step 2: Confirm overwrite
+      const confirmed = window.confirm(
+        `Importing this backup will replace all your current data:\n\n` +
+        `• ${backup.tasks.length} tasks\n` +
+        `• ${backup.lists.length} lists\n` +
+        `• ${backup.tags.length} tags\n\n` +
+        `Backup created: ${new Date(backup.exportedAt).toLocaleString()}\n\n` +
+        `This action cannot be undone. Continue?`
+      )
+      
+      if (!confirmed) {
+        setBackupStatus({ type: null, message: '' })
+        setIsImporting(false)
+        return
+      }
+      
+      // Step 3: Restore the data
+      const restoreResult = await window.electronAPI.backup.restore(backup)
+      
+      if (restoreResult.success) {
+        // Reload all data from database
+        await loadAll()
+        setBackupStatus({ type: 'success', message: 'Backup imported successfully! Data has been restored.' })
+      } else {
+        setBackupStatus({ type: 'error', message: restoreResult.error || 'Restore failed' })
+      }
+    } catch (error) {
+      setBackupStatus({ type: 'error', message: String(error) })
+    } finally {
+      setIsImporting(false)
     }
   }
 
@@ -236,6 +334,59 @@ export function SettingsModal() {
               <p className="text-sm text-surface-500 italic">
                 No tags created yet
               </p>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-white/10" />
+
+          {/* Backup & Restore */}
+          <div>
+            <label className="text-sm font-medium text-surface-400 mb-3 flex items-center gap-2">
+              <ArrowDownTrayIcon className="w-4 h-4" />
+              Backup & Restore
+            </label>
+            <p className="text-xs text-surface-500 mb-4">
+              Export your data to a file for backup, or restore from a previous backup.
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleExport}
+                disabled={isExporting || isImporting}
+                className="flex-1 btn btn-secondary flex items-center justify-center gap-2"
+              >
+                <ArrowDownTrayIcon className="w-4 h-4" />
+                {isExporting ? 'Exporting...' : 'Export data'}
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={isExporting || isImporting}
+                className="flex-1 btn btn-secondary flex items-center justify-center gap-2"
+              >
+                <ArrowUpTrayIcon className="w-4 h-4" />
+                {isImporting ? 'Importing...' : 'Import data'}
+              </button>
+            </div>
+            
+            {/* Status message */}
+            {backupStatus.type && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`mt-3 p-3 rounded-lg flex items-center gap-2 text-sm ${
+                  backupStatus.type === 'success'
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-red-500/20 text-red-400'
+                }`}
+              >
+                {backupStatus.type === 'success' ? (
+                  <CheckCircleIcon className="w-4 h-4 flex-shrink-0" />
+                ) : (
+                  <ExclamationCircleIcon className="w-4 h-4 flex-shrink-0" />
+                )}
+                {backupStatus.message}
+              </motion.div>
             )}
           </div>
         </div>

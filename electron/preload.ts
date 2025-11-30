@@ -46,6 +46,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('notification:show', options),
   },
   
+  // Backup / Export / Import
+  backup: {
+    export: (data: unknown) => ipcRenderer.invoke('backup:export', data),
+    import: () => ipcRenderer.invoke('backup:import'),
+    restore: (data: unknown) => ipcRenderer.invoke('backup:restore', data),
+  },
+  
   // Event listeners
   on: (channel: string, callback: (...args: unknown[]) => void) => {
     const validChannels = ['trigger-quick-add', 'notification-clicked']
