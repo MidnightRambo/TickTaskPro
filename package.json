@@ -8,6 +8,11 @@
     "build": "tsc && vite build && electron-builder",
     "build:mac": "tsc && vite build && electron-builder --mac --arm64",
     "build:win": "tsc && vite build && electron-builder --win --x64",
+    "dist": "tsc && vite build && electron-builder",
+    "dist:mac": "tsc && vite build && electron-builder --mac --arm64 --publish never",
+    "dist:win": "tsc && vite build && electron-builder --win --x64 --publish never",
+    "publish:mac": "tsc && vite build && electron-builder --mac --arm64 --publish always",
+    "publish:win": "tsc && vite build && electron-builder --win --x64 --publish always",
     "preview": "vite preview",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "typecheck": "tsc --noEmit",
@@ -38,7 +43,8 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "icon": "assets/icons/icon.icns"
+      "icon": "assets/icons/icon.icns",
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
     },
     "win": {
       "target": [
@@ -47,14 +53,20 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icons/icon.ico"
+      "icon": "assets/icons/icon.ico",
+      "artifactName": "${productName}-${version}-win-${arch}.${ext}"
     },
     "linux": {
-      "icon": "assets/icons"
+      "icon": "assets/icons",
+      "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
     }
   },
   "dependencies": {
