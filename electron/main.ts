@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Notification, globalShortcut, nativeImage, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, Notification, globalShortcut, nativeImage, dialog, Menu } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { initDatabase, getDatabase } from './database'
@@ -23,16 +23,24 @@ function getIconPath(): string {
 }
 
 function createWindow() {
+  const isMac = process.platform === 'darwin'
+  
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1000,
     minHeight: 700,
     title: 'TickTaskPro',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 16 },
+    // macOS-specific title bar styling
+    ...(isMac ? {
+      titleBarStyle: 'hiddenInset',
+      trafficLightPosition: { x: 16, y: 16 },
+    } : {
+      // Windows/Linux: hide the menu bar
+      autoHideMenuBar: true,
+    }),
     backgroundColor: '#09090b',
-    icon: getIconPath(), // NOTE: Replace with real TickTaskPro icon
+    icon: getIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -40,6 +48,12 @@ function createWindow() {
       sandbox: false,
     },
   })
+
+  // On Windows/Linux, completely hide the menu bar
+  if (!isMac) {
+    mainWindow.setMenuBarVisibility(false)
+    Menu.setApplicationMenu(null)
+  }
 
   if (VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(VITE_DEV_SERVER_URL)
