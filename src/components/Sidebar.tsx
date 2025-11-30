@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from '../store'
 import type { List } from '../types'
@@ -15,7 +15,30 @@ import {
   BriefcaseIcon,
   TrashIcon,
   PencilIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
+
+// Color palette for lists - matches existing system
+const LIST_COLORS = [
+  { name: 'Gray', value: '#6b7280' },
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Orange', value: '#f97316' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Lime', value: '#84cc16' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Emerald', value: '#10b981' },
+  { name: 'Teal', value: '#14b8a6' },
+  { name: 'Cyan', value: '#06b6d4' },
+  { name: 'Sky', value: '#0ea5e9' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Indigo', value: '#6366f1' },
+  { name: 'Violet', value: '#8b5cf6' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Fuchsia', value: '#d946ef' },
+  { name: 'Pink', value: '#ec4899' },
+  { name: 'Rose', value: '#f43f5e' },
+]
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   inbox: InboxIcon,
@@ -34,6 +57,7 @@ export function Sidebar() {
     sidebarCollapsed,
     toggleSidebar,
     createList,
+    updateList,
     deleteList,
     setTagManagerOpen,
   } = useStore()
@@ -41,6 +65,40 @@ export function Sidebar() {
   const [isCreatingList, setIsCreatingList] = useState(false)
   const [newListName, setNewListName] = useState('')
   const [editingListId, setEditingListId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editColor, setEditColor] = useState('#6b7280')
+  
+  // Get the list being edited
+  const editingList = editingListId ? lists.find(l => l.id === editingListId) : null
+  
+  // Sync edit form with selected list
+  useEffect(() => {
+    if (editingList) {
+      setEditName(editingList.name)
+      setEditColor(editingList.color)
+    }
+  }, [editingList])
+  
+  const handleEditList = async () => {
+    if (!editingListId || !editName.trim()) return
+    
+    const list = lists.find(l => l.id === editingListId)
+    if (!list) return
+    
+    await updateList({
+      ...list,
+      name: editName.trim(),
+      color: editColor,
+    })
+    
+    setEditingListId(null)
+  }
+  
+  const handleCancelEdit = () => {
+    setEditingListId(null)
+    setEditName('')
+    setEditColor('#6b7280')
+  }
 
   const handleCreateList = async () => {
     if (newListName.trim()) {
@@ -207,14 +265,22 @@ export function Sidebar() {
                 {!sidebarCollapsed && (
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex gap-1">
                     <button
-                      onClick={() => setEditingListId(list.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingListId(list.id)
+                      }}
                       className="p-1 rounded text-surface-500 hover:text-white hover:bg-white/10"
+                      title="Edit list"
                     >
                       <PencilIcon className="w-3 h-3" />
                     </button>
                     <button
-                      onClick={() => handleDeleteList(list.id)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteList(list.id)
+                      }}
                       className="p-1 rounded text-surface-500 hover:text-red-500 hover:bg-white/10"
+                      title="Delete list"
                     >
                       <TrashIcon className="w-3 h-3" />
                     </button>
@@ -263,6 +329,109 @@ export function Sidebar() {
           {!sidebarCollapsed && <span>Manage Tags</span>}
         </button>
       </div>
+      
+      {/* Edit List Modal */}
+      <AnimatePresence>
+        {editingListId && editingList && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
+            onClick={(e) => e.target === e.currentTarget && handleCancelEdit()}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md bg-surface-900 rounded-2xl shadow-2xl border border-white/10 overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: editColor + '20' }}
+                  >
+                    <FolderIcon className="w-4 h-4" style={{ color: editColor }} />
+                  </div>
+                  <h2 className="text-lg font-semibold">Edit List</h2>
+                </div>
+                <button
+                  onClick={handleCancelEdit}
+                  className="p-2 rounded-lg text-surface-500 hover:text-white hover:bg-white/10"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+              
+              {/* Modal Content */}
+              <div className="p-4 space-y-4">
+                {/* Name input */}
+                <div>
+                  <label className="text-sm font-medium text-surface-400 mb-2 block">
+                    List Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleEditList()
+                      if (e.key === 'Escape') handleCancelEdit()
+                    }}
+                    className="w-full"
+                    placeholder="Enter list name..."
+                    autoFocus
+                  />
+                </div>
+                
+                {/* Color picker */}
+                <div>
+                  <label className="text-sm font-medium text-surface-400 mb-2 block">
+                    Color
+                  </label>
+                  <div className="grid grid-cols-9 gap-2">
+                    {LIST_COLORS.map(color => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        onClick={() => setEditColor(color.value)}
+                        className={`
+                          w-8 h-8 rounded-lg transition-all
+                          ${editColor === color.value 
+                            ? 'ring-2 ring-white ring-offset-2 ring-offset-surface-900 scale-110' 
+                            : 'hover:scale-110'
+                          }
+                        `}
+                        style={{ backgroundColor: color.value }}
+                        title={color.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 p-4 border-t border-white/10">
+                <button
+                  onClick={handleCancelEdit}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditList}
+                  disabled={!editName.trim()}
+                  className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.aside>
   )
 }

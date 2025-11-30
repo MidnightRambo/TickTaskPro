@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import * as chrono from 'chrono-node'
 import type { Task, List, Tag, Settings, EisenhowerRule, TaskFilter, ViewMode, Quadrant, Priority } from '../types'
+import { calculateNextOccurrence } from '../utils/date'
 
 interface AppState {
   // Data
@@ -190,8 +191,39 @@ export const useStore = create<AppState>((set, get) => ({
   
   toggleTaskComplete: async (id: string) => {
     const task = get().tasks.find(t => t.id === id)
-    if (task) {
-      await get().updateTask({ ...task, completed: !task.completed })
+    if (!task) return
+    
+    const wasCompleted = task.completed
+    const willBeCompleted = !wasCompleted
+    
+    // Update the current task
+    await get().updateTask({ ...task, completed: willBeCompleted })
+    
+    // If completing a recurring task, create the next occurrence
+    if (willBeCompleted && task.recurrenceRule) {
+      const nextDueDate = calculateNextOccurrence(task.dueDate, task.recurrenceRule)
+      
+      if (nextDueDate) {
+        const now = new Date().toISOString()
+        const nextTask: Task = {
+          id: uuidv4(),
+          title: task.title,
+          description: task.description,
+          listId: task.listId,
+          tags: [...task.tags],
+          priority: task.priority,
+          dueDate: nextDueDate,
+          completed: false,
+          recurrenceRule: task.recurrenceRule,
+          createdAt: now,
+          updatedAt: now,
+          manualQuadrant: task.manualQuadrant,
+        }
+        
+        // Create the next occurrence in the database
+        const created = await window.electronAPI.tasks.create(nextTask)
+        set(state => ({ tasks: [created, ...state.tasks] }))
+      }
     }
   },
   

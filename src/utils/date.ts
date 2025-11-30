@@ -120,6 +120,103 @@ export function addHours(date: Date, hours: number): Date {
   return result
 }
 
+export function addWeeks(date: Date, weeks: number): Date {
+  return addDays(date, weeks * 7)
+}
+
+export function addMonths(date: Date, months: number): Date {
+  const result = new Date(date)
+  const targetMonth = result.getMonth() + months
+  const targetDay = result.getDate()
+  
+  // Set to first day of target month first to avoid overflow issues
+  result.setDate(1)
+  result.setMonth(targetMonth)
+  
+  // Then set the day, clamping to last day of month if needed
+  const lastDayOfMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate()
+  result.setDate(Math.min(targetDay, lastDayOfMonth))
+  
+  return result
+}
+
+/**
+ * Get the next occurrence date after baseDate that falls on one of the specified weekdays.
+ * @param baseDate - The current due date
+ * @param weekdays - Array of weekday numbers (0=Sunday, 1=Monday, ..., 6=Saturday)
+ * @returns The next valid date
+ */
+export function getNextWeekdayOccurrence(baseDate: Date, weekdays: number[]): Date {
+  if (weekdays.length === 0) {
+    // Fallback: return tomorrow if no weekdays specified
+    return addDays(baseDate, 1)
+  }
+  
+  const sortedDays = [...weekdays].sort((a, b) => a - b)
+  const currentDay = baseDate.getDay()
+  
+  // Find the next day in the cycle after today
+  let daysToAdd = 0
+  let found = false
+  
+  // Look for the next weekday after the current day
+  for (const day of sortedDays) {
+    if (day > currentDay) {
+      daysToAdd = day - currentDay
+      found = true
+      break
+    }
+  }
+  
+  // If not found (current day is >= all selected days), wrap to next week
+  if (!found) {
+    daysToAdd = (7 - currentDay) + sortedDays[0]
+  }
+  
+  // Ensure we always move at least 1 day forward
+  if (daysToAdd === 0) {
+    daysToAdd = 7
+  }
+  
+  return addDays(baseDate, daysToAdd)
+}
+
+/**
+ * Calculate the next occurrence date based on recurrence rule.
+ * @param currentDueDate - The current due date (or today if no due date)
+ * @param recurrenceRule - The recurrence rule string
+ * @returns The next occurrence date ISO string, or undefined if no recurrence
+ */
+export function calculateNextOccurrence(currentDueDate: string | undefined, recurrenceRule: string): string | undefined {
+  if (!recurrenceRule) return undefined
+  
+  // Use current due date or today as base
+  const baseDate = currentDueDate ? new Date(currentDueDate) : new Date()
+  let nextDate: Date
+  
+  if (recurrenceRule === 'daily') {
+    nextDate = addDays(baseDate, 1)
+  } else if (recurrenceRule === 'weekly') {
+    nextDate = addWeeks(baseDate, 1)
+  } else if (recurrenceRule === 'biweekly') {
+    nextDate = addWeeks(baseDate, 2)
+  } else if (recurrenceRule === 'monthly') {
+    nextDate = addMonths(baseDate, 1)
+  } else if (recurrenceRule.startsWith('weekdays:')) {
+    // Parse weekdays format: "weekdays:1,2,3,4,5"
+    const daysStr = recurrenceRule.replace('weekdays:', '')
+    const weekdays = daysStr.split(',').map(Number).filter(n => !isNaN(n) && n >= 0 && n <= 6)
+    nextDate = getNextWeekdayOccurrence(baseDate, weekdays)
+  } else if (recurrenceRule === 'weekdays') {
+    // Legacy format: Mon-Fri
+    nextDate = getNextWeekdayOccurrence(baseDate, [1, 2, 3, 4, 5])
+  } else {
+    return undefined
+  }
+  
+  return nextDate.toISOString()
+}
+
 export function formatRelative(date: Date): string {
   if (isToday(date)) {
     return `Today at ${format(date, 'h:mm a')}`

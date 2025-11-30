@@ -37,6 +37,7 @@ export function TaskDrawer() {
     selectTask, 
     updateTask, 
     deleteTask,
+    toggleTaskComplete,
     tags: allTags,
     lists,
     createTag,
@@ -181,18 +182,28 @@ export function TaskDrawer() {
           <h2 className="font-semibold">Task Details</h2>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleDelete}
-              className="p-2 rounded-lg text-surface-500 hover:text-red-500 hover:bg-white/10 transition-colors"
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                handleDelete()
+              }}
+              className="p-2 rounded-lg text-surface-500 hover:text-red-500 hover:bg-white/10 transition-colors cursor-pointer"
               aria-label="Delete task"
             >
-              <TrashIcon className="w-5 h-5" />
+              <TrashIcon className="w-5 h-5 pointer-events-none" />
             </button>
             <button
-              onClick={handleClose}
-              className="p-2 rounded-lg text-surface-500 hover:text-white hover:bg-white/10 transition-colors"
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                handleClose()
+              }}
+              className="p-2 rounded-lg text-surface-500 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               aria-label="Close task details"
             >
-              <XMarkIcon className="w-5 h-5" />
+              <XMarkIcon className="w-5 h-5 pointer-events-none" />
             </button>
           </div>
         </div>
@@ -213,7 +224,10 @@ export function TaskDrawer() {
           {/* Complete checkbox */}
           <div className="flex items-center gap-3">
             <button
-              onClick={() => updateTask({ ...task, completed: !task.completed })}
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleTaskComplete(task.id)
+              }}
               className={`
                 flex items-center gap-2 px-3 py-2 rounded-lg transition-colors
                 ${task.completed 
