@@ -21,8 +21,10 @@
   "build": {
     "appId": "com.ticktaskpro.app",
     "productName": "TickTaskPro",
+    "asar": true,
+    "asarUnpack": "**/*.node",
     "directories": {
-      "output": "release"
+      "output": "/tmp/ticktaskpro-release"
     },
     "files": [
       "dist/**/*",
@@ -39,18 +41,23 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64"]
+          "arch": [
+            "arm64"
+          ]
         }
       ],
       "category": "public.app-category.productivity",
       "icon": "assets/icons/icon.icns",
-      "artifactName": "${productName}-${version}-mac-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-mac-${arch}.${ext}",
+      "hardenedRuntime": false
     },
     "win": {
       "target": [
         {
           "target": "zip",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icons/icon.ico",
@@ -67,7 +74,7 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
-    "better-sqlite3": "^11.5.0",
+    "better-sqlite3": "^12.5.0",
     "chrono-node": "^2.7.7",
     "electron-store": "^10.0.0",
     "framer-motion": "^11.11.17",
@@ -87,15 +94,14 @@
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
+    "electron": "^35.7.5",
+    "electron-builder": "^26.0.12",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11",
+    "vite": "^7.2.6",
     "vite-plugin-electron": "^0.28.8",
     "vite-plugin-electron-renderer": "^0.14.6",
     "wait-on": "^8.0.1"
   }
 }
-
